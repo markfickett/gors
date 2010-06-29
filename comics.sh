@@ -44,7 +44,7 @@ For example:
 		'http:\/\/drmcninja\.com\/page\.php\?pageNum=.*\&issue=.*' \\
 		a href 2
 Various files of the form [comicname][xyz] will be used
-	temporarily, and the file [comicname]old will be used to store
+	temporarily, and the file cache/[comicname]old will be used to store
 	the url (attribute value) of the latest available image (or other item).
 EOF
 	echo Original call was: $*
@@ -244,12 +244,12 @@ then
 	exit
 fi
 
-if test -e ${COMICNAME}old
+if test -e cache/${COMICNAME}old
 then
-	if test ${CURRENT} != `cat ${COMICNAME}old`
+	if test ${CURRENT} != `cat cache/${COMICNAME}old`
 	then
 		echo '     New '${COMICNAME}'!'
-		echo ${CURRENT} > ${COMICNAME}old
+		echo ${CURRENT} > cache/${COMICNAME}old
 		if [ "${OPENATTRIBUTE}" ]
 		then
 			${OPENCMD} ${CURRENT} &
@@ -266,7 +266,7 @@ then
 	fi
 else
 	echo '  No old '${COMICNAME}'.'
-	echo ${CURRENT} > ${COMICNAME}old
+	echo ${CURRENT} > cache/${COMICNAME}old
 	if [ "${OPENATTRIBUTE}" ]
 	then
 		${OPENCMD} ${CURRENT} &
