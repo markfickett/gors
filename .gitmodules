@@ -1,0 +1,3 @@
+[submodule "QtUtil"]
+	path = QtUtil
+	url = file:///Users/markfickett/Documents/code/QtUtil
