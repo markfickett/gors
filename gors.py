@@ -14,7 +14,7 @@ Update all feeds and open all new content, or only named feeds:
 Add a new feed:
   %prog --add NAME --rss-url URL --open-url URL
 Remove a feed:
-  %prog --remove NAME
+  %prog --delete NAME
 List information about all or only named feeds:
   % prog --list [NAME ...]""",
 	version='%%prog %s' % Manifest.VERSION_STRING,
@@ -31,10 +31,10 @@ addGroup.add_option('--open-url', dest='openurl', metavar='URL',
 		+ ' opened in a web browser when new content is available.'))
 parser.add_option_group(addGroup)
 
-removeGroup = optparse.OptionGroup(parser, 'Remove A Feed')
-removeGroup.add_option('-r', '--remove', metavar='NAME',
-	help='Remove a feed, specified by name.')
-parser.add_option_group(removeGroup)
+deleteGroup = optparse.OptionGroup(parser, 'Delete A Feed')
+deleteGroup.add_option('-d', '--delete', metavar='NAME',
+	help='Delete a feed, specified by name.')
+parser.add_option_group(deleteGroup)
 
 listGroup = optparse.OptionGroup(parser, 'List Feeds')
 listGroup.add_option('-l', '--list', action='store_true',
@@ -64,7 +64,7 @@ log.debug("settings file is '%s'" % str(settings.fileName()))
 feedGroup = FeedGroup()
 feedGroup.readSettings(settings)
 
-doUpdate = not any([options.add, options.remove, options.list])
+doUpdate = not any([options.add, options.delete, options.list])
 if not (doUpdate or options.list) and args:
 	parser.error(('positional arguments legal only when updating'
 		+ ' or listing (with --list): %s')
@@ -82,10 +82,10 @@ if options.add:
 	if options.openurl:
 		feed.setOpenURL(options.openurl)
 	feedGroup.addFeed(feed)
-if options.remove:
-	feed = feedGroup.getFeed(options.remove)
+if options.delete:
+	feed = feedGroup.getFeed(options.delete)
 	if not feed:
-		parser.error("not found: '%s'" % options.remove)
+		parser.error("not found: '%s'" % options.delete)
 	feedGroup.removeFeed(feed)
 if options.list:
 	kwargs = {}

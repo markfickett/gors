@@ -15,9 +15,6 @@ class Feed(QtCore.QObject):
 	Store information about a feed, including URLs to check and to open,
 	and timestamps of the latest available and viewed content.
 
-	All dates are stored as double-precision seconds since the epoc, UTC.
-	(See time.time().)
-
 	A Feed's log is a public field, so a Feed's owner can conveniently
 	log messages under the Feed's name.
 
@@ -43,7 +40,7 @@ class Feed(QtCore.QObject):
 		self.__openURL = None
 		self.__opened = None
 		self.__current = None
-		self.__checked = None
+		self.__checked = None	# double-precision seconds since epoch
 
 		self.__error = None
 		self.__updateThread = None
@@ -159,20 +156,16 @@ class Feed(QtCore.QObject):
 			self.__openURL = str(settings.value(
 				str(self.__SETTINGS.URL_OPEN)).toString())
 		if settings.contains(str(self.__SETTINGS.OPENED)):
-			f, ok = settings.value(
-				str(self.__SETTINGS.OPENED)).toDouble()
-			if ok:
-				self.__opened = f
+			qv = settings.value(str(self.__SETTINGS.OPENED))
+			self.__opened = str(qv.toString())
 		if settings.contains(str(self.__SETTINGS.CURRENT)):
-			f, ok = settings.value(
-				str(self.__SETTINGS.CURRENT)).toDouble()
-			if ok:
-				self.__current = f
+			qv = settings.value(str(self.__SETTINGS.CURRENT))
+			self.__current = str(qv.toString())
 		if settings.contains(str(self.__SETTINGS.CHECKED)):
-			f, ok = settings.value(
+			d, ok = settings.value(
 				str(self.__SETTINGS.CHECKED)).toDouble()
 			if ok:
-				self.__checked = f
+				self.__checked = d
 
 
 	def writeSettings(self, settings):
@@ -207,7 +200,7 @@ class Feed(QtCore.QObject):
 		else:
 			info.append('URL to Open: %s' % self.__openURL)
 
-		label = '          Last Checked'
+		label = 'Last Checked'
 		if self.__checked is None:
 			info.append('%s: Never' % label)
 		else:
@@ -215,8 +208,7 @@ class Feed(QtCore.QObject):
 				% (label, time.ctime(self.__checked)))
 
 		label = 'Latest Known Available'
-		info.append('%s: %s' % (label,
-			self.__current and time.ctime(self.__current)))
+		info.append('%s: %s' % (label, self.__current))
 
 		label = '         Latest Opened'
 		if self.hasUnopened():
@@ -224,7 +216,7 @@ class Feed(QtCore.QObject):
 		else:
 			hasNew = ''
 		info.append('%s: %s%s' % (label,
-			self.__opened and time.ctime(self.__opened),
+			self.__opened,
 			hasNew))
 
 		return '\n\t'.join(info)
@@ -254,6 +246,54 @@ class UpdateThread(QtCore.QThread):
 		self.emit(QtCore.SIGNAL('updateFinished'))
 
 
+	def __getFirstItemText(self, dom, name):
+		"""
+		Find the named attribute on the first item
+		and return its text value.
+		@return a tuple of (attributeText, errorMsg)
+		"""
+		elements = dom.getElementsByTagName(name)
+		if not elements:
+			error = ('error parsing: found no %s elements'
+				% name)
+			return None, error
+
+		element = elements[0]
+		textNode = element.firstChild
+
+		if textNode is None \
+		or textNode.nodeType != minidom.Node.TEXT_NODE:
+			error = ('error parsing: expected text'
+				+ ' as only child of %s') % name
+			return None, error
+
+		return str(textNode.data), None
+
+
+	def __getPubDate(self, dom):
+		"""
+		Get the first item's pubDate attribute
+		as double seconds since the epoch.
+		"""
+		dateText, error = self.__getFirstItemText(dom, 'pubDate')
+		if dateText is None:
+			return None, error
+
+		parsedDateTuple = email.utils.parsedate_tz(dateText)
+		if not parsedDateTuple:
+			error = ("error parsing '%s' as date" % dateText)
+			return None, error
+
+		try:
+			doubleTime = email.utils.mktime_tz(parsedDateTuple)
+		except:
+			error = ("error building time value"
+				+ " from parsed date '%s'") % dateText
+			return None, error
+
+		return doubleTime, None
+
+
 	def __doUpdate(self):
 		try:
 			response = urllib2.urlopen(self.__rssURL)
@@ -275,45 +315,16 @@ class UpdateThread(QtCore.QThread):
 			self.log.error(self.__error, exc_info=True)
 			return
 
-		lastBuildDateElements = \
-			dom.getElementsByTagName('lastBuildDate')
-		n = len(lastBuildDateElements)
-		if n != 1:
-			self.__error = ('error parsing: found %d (not 1)'
-				+ ' lastBuildDate elements') % n
-			self.log.error(self.__error)
+		text, error = self.__getFirstItemText(dom, 'guid')
+		if text is None:
+			text, error = self.__getFirstItemText(dom, 'pubDate')
+		if text is None:
+			self.__error = error
+			self.log.error(error)
 			return
 
-		lastBuildDateElement = lastBuildDateElements[0]
-		lastBuildTextNode = lastBuildDateElement.firstChild
-
-		if lastBuildTextNode is None \
-		or lastBuildTextNode.nodeType != minidom.Node.TEXT_NODE:
-			self.__error = 'error parsing: ' + \
-				'expected text as only child of lastBuildDate'
-			self.log.error(self.__error)
-			return
-
-		lastBuildText = str(lastBuildTextNode.data)
-
-		parsedDateTuple = email.utils.parsedate_tz(lastBuildText)
-		if not parsedDateTuple:
-			self.__error = ("error parsing '%s' as date"
-				% lastBuildText)
-			self.log.error(self.__error)
-			return
-
-		try:
-			lastBuildTime = email.utils.mktime_tz(parsedDateTuple)
-		except:
-			self.__error = ("error building time value"
-				+ " from parsed date '%s'") % lastBuildText
-			self.log.error(self.__error, exc_info=True)
-			return
-
-		self.__current = lastBuildTime
-		self.log.debug('found current: %s (from %s)'
-			% (self.__current, lastBuildText))
+		self.__current = text
+		self.log.debug('found current: %s' % self.__current)
 
 
 	def getError(self):
