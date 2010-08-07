@@ -1,43 +1,35 @@
-Mark Fickett [ naib.webhop.org ]
-Last updated 2008 September 21
+Check for updates to web sites' RSS feeds and, in response, open the main web site. This is meant for sites which present content in a more pleasing way than does an RSS reader; and for users who wish to keep all content in the web browser in favor of adding alternate viewers.
 
-This system is meant to check for updates in webcomics (or other web pages) and open the web site for viewing if there is an update.
+The name 'gors' is derived from 'Go RSS', and is pronounced like the gorse bush.
 
-Usage: comics [comicnames ...]
-	comics is something that runs comics/main.sh
-	comicnames are whitespace-separated names of comics from comics.conf
+The implementation is in Python and requires:
+	PyQt: http://www.riverbankcomputing.co.uk/software/pyqt/download
+	enum (single file Python package): http://pypi.python.org/pypi/enum/
 
-An example of how it looks from  the command line:
-$ comics
-  No new drmcninja.
-Error in flakypastry: no match.
-  No new scarygoround.
-  No new ddoi.
-  No new qc.
-  No new catandgirl.
-     New bunny!
-     New qwantz!
-     New gc!
-  No new postsecret.
-  No old shortpacked.
-     New dooce!
-  No old wondermark.
+As of 2010 August, my (Mark Fickett's) intent is to write a menu bar (or system tray) version; otherwise the Qt dependency would have been avoided. (However, with that planned, Qt's signals and threads were convenient.) (Version 0.1 is the original shell script implementation.)
 
-Another example invocation might be:
-# comics qc gc
-  No new qc.
-     New gc!
 
-(A source checked for the first time opens by default with the 'No old' message. An updated source opens in the default web browser with the 'New .. !' message. An error can occur with an HTTP timeout or a bad regular expression. A source that hasn't been updated results in the 'No new' message.)
+Example Usage (run gors --help for more):
 
-Run main.sh to check comics. (Double-clicking and invocation from other directories is supported.) If arguments are supplied to main.sh, only the given comics are checked. (I have "alias comics='code/comics/main.sh'" in my shell init file.)
+Check all feeds:
+$ gors
+[INFO asofterworld] no update
+[INFO ddoi] new: opening
+[INFO bigpicture] no update
+[INFO samandfuzzy] no update
+[INFO visualnotes] new: opening
+[INFO xkcd] new: opening
 
-Edit comics.conf with new comic names, comic URLs, and comic image regular expressions to add new checks. Each unique comic name will have a [comicname]old file to store the latest retreived comic image URL.
+Check only named feeds:
+$ gors ddoi
+[INFO ddoi] new: opening
 
-If you come across a comic for which the html pre-processing is insufficient (and the image URL is therefore unretreivable), let me know what needs to be done! If you comment out the DEBUG='n' line (with #), [comicname]html will be left available for perusal as the pre-processed html.
+Add a new feed:
+$ gors --add 3ps --open-url http://www.threepanelsoul.com/index.php --rss-url http://www.rsspect.com/rss/threeps.xml
+(Note that services such as rsspect.com and feed43.com can be used to create feeds for web sites which do not have RSS feeds.)
 
-There is some duplication of effort with RSS, however I find this more convenient, and the workflow I want (if new, open latest in web browser) is something I have not found in an RSS client. Also, since the retreived data for the status check is the HTML only, this is likely not a greater drain on server resources.
 
-Linux is easily supported by editing comics.sh and setting OPENCMD='firefox' - that is, making firefox the comman used to open URLs of updated comics.
+Implementation
 
-Bugs: The HTML tags specified are case-sensitive.
+When invoked, gors requests that each of the objects representing feeds check for updates. Each feed object starts a new thread which fetches the RSS feed's source, parses the returned XML, and stores the latest available item's guid attribute; the feed object then notifies gors (via Qt signal). For any updated feeds, gors opens the main URL in the OS-designated web browser.
+
