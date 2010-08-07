@@ -16,7 +16,7 @@ Add a new feed:
 Remove a feed:
   %prog --delete NAME
 List information about all or only named feeds:
-  % prog --list [NAME ...]""",
+  %prog --list [NAME ...]""",
 	version='%%prog %s' % Manifest.VERSION_STRING,
 )
 parser.add_option('-v', '--verbose', action='store_true')
