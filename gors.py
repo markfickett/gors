@@ -29,6 +29,9 @@ addGroup.add_option('--rss-url', dest='rssurl', metavar='URL',
 addGroup.add_option('--open-url', dest='openurl', metavar='URL',
 	help=('Specify the URL to open for a new feed. This is the address'
 		+ ' opened in a web browser when new content is available.'))
+addGroup.add_option('--username', dest='username', metavar='USERNAME',
+	help=('Specify a username for basic HTTP authentication. A password '
+		+ 'prompt will be presented when the RSS url is retrieved.'))
 parser.add_option_group(addGroup)
 
 deleteGroup = optparse.OptionGroup(parser, 'Delete A Feed')
@@ -81,6 +84,8 @@ if options.add:
 	feed.setRSSURL(options.rssurl)
 	if options.openurl:
 		feed.setOpenURL(options.openurl)
+	if options.username:
+		feed.setUsername(options.username)
 	feedGroup.addFeed(feed)
 if options.delete:
 	feed = feedGroup.getFeed(options.delete)

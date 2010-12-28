@@ -4,7 +4,7 @@ __all__ = [
 
 from Manifest import QtCore, enum, webbrowser, \
 	urllib2, xml, email, time, \
-	logging
+	logging, urllib, getpass
 import email.utils
 from xml.dom import minidom
 
@@ -28,6 +28,7 @@ class Feed(QtCore.QObject):
 		'OPENED',
 		'CURRENT',
 		'CHECKED',
+		'AUTH_USERNAME',
 	)
 	def __init__(self, name):
 		"""
@@ -40,6 +41,7 @@ class Feed(QtCore.QObject):
 		self.__openURL = None
 		self.__opened = None
 		self.__current = None
+		self.__authUsername = None	# implies basic HTTP auth
 		self.__checked = None	# double-precision seconds since epoch
 
 		self.__error = None
@@ -72,6 +74,19 @@ class Feed(QtCore.QObject):
 	def getError(self):
 		"""Get a string error message, or None."""
 		return self.__error
+
+
+	def setUsername(self, username):
+		"""
+		Set a username, which will cause basic HTTP authentication
+		to be used; the password will be prompted for at urlopen time.
+		(Assume a change in username affects data retrieved.)
+		"""
+		newUsername = str(username)
+		if self.__authUsername != newUsername:
+			self.__authUsername = newUsername
+			self.__checked = None
+			self.__current = None
 
 
 	def hasUnopened(self):
@@ -117,7 +132,8 @@ class Feed(QtCore.QObject):
 
 		if self.__updateThread is not None:
 			return
-		self.__updateThread = UpdateThread(self.__name, self.__rssURL)
+		self.__updateThread = UpdateThread(self.__name, self.__rssURL,
+			username=self.__authUsername)
 		self.connect(self.__updateThread,
 			QtCore.SIGNAL('updateFinished'),
 			self.__updateThreadFinished)
@@ -166,6 +182,9 @@ class Feed(QtCore.QObject):
 				str(self.__SETTINGS.CHECKED)).toDouble()
 			if ok:
 				self.__checked = d
+		if settings.contains(str(self.__SETTINGS.AUTH_USERNAME)):
+			qv = settings.value(str(self.__SETTINGS.AUTH_USERNAME))
+			self.__authUsername = str(qv.toString())
 
 
 	def writeSettings(self, settings):
@@ -188,6 +207,10 @@ class Feed(QtCore.QObject):
 		if self.__checked is not None:
 			settings.setValue(str(self.__SETTINGS.CHECKED),
 				QtCore.QVariant(self.__checked))
+		if self.__authUsername is not None:
+			settings.setValue(str(self.__SETTINGS.AUTH_USERNAME),
+				QtCore.QVariant(QtCore.QString(
+					self.__authUsername)))
 
 
 	def __str__(self):
@@ -218,8 +241,27 @@ class Feed(QtCore.QObject):
 		info.append('%s: %s%s' % (label,
 			self.__opened,
 			hasNew))
+		if self.__authUsername is not None:
+			info.append('Authenticate for "%s"'
+				% self.__authUsername)
 
 		return '\n\t'.join(info)
+
+
+
+class PasswordPromptingOpener(urllib.FancyURLopener):
+	"""
+	Open a URL with basic HTTP authentication,
+	prompting for password but having username set beforehand.
+	"""
+	def __init__(self, username):
+		urllib.FancyURLopener.__init__(self)
+		self.__username = str(username)
+
+	def prompt_user_passwd(self, host, realm):
+		password = getpass.getpass('Password for %s@%s (%s): '
+			% (self.__username, host, realm))
+		return (self.__username, password)
 
 
 
@@ -231,11 +273,12 @@ class UpdateThread(QtCore.QThread):
 	Signals:
 		updateFinished	update completed (success or failure)
 	"""
-	def __init__(self, name, rssURL):
+	def __init__(self, name, rssURL, username=None):
 		QtCore.QThread.__init__(self)
 		self.__rssURL = rssURL
 		self.__error = None
 		self.__current = None
+		self.__username = username
 
 		self.log = logging.getLogger(name)
 
@@ -296,7 +339,15 @@ class UpdateThread(QtCore.QThread):
 
 	def __doUpdate(self):
 		try:
-			response = urllib2.urlopen(self.__rssURL)
+			if self.__username is not None:
+				# Use FancyURLopener instead of
+				# urllib2.HTTPBasicAuthHandler so that realm
+				# and uri do not have to be set beforehand.
+				authOpener = PasswordPromptingOpener(
+					self.__username)
+				response = authOpener.open(self.__rssURL)
+			else:
+				response = urllib2.urlopen(self.__rssURL)
 		except urllib2.HTTPError, e:
 			self.__error = str(e)
 			self.log.error(self.__error, exc_info=True)
@@ -318,6 +369,8 @@ class UpdateThread(QtCore.QThread):
 		text, error = self.__getFirstItemText(dom, 'guid')
 		if text is None:
 			text, error = self.__getFirstItemText(dom, 'pubDate')
+		if text is None: # atom feed
+			text, error = self.__getFirstItemText(dom, 'issued')
 		if text is None:
 			self.__error = error
 			self.log.error(error)

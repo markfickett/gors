@@ -6,7 +6,7 @@ logging.basicConfig(
 import QtUtil
 from QtUtil.Manifest import QtCore, QtGui
 import enum
-import webbrowser, urllib2, xml, email, time, optparse
+import webbrowser, urllib2, xml, email, time, optparse, urllib, getpass
 
 VERSION = (0, 1)
 VERSION_STRING = '.'.join([str(v) for v in VERSION])
