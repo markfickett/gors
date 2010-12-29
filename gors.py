@@ -87,6 +87,7 @@ if options.delete:
 	if not feed:
 		parser.error("not found: '%s'" % options.delete)
 	feedGroup.removeFeed(feed)
+	settings.clear() # otherwise the deleted feed persists in settings
 if options.list:
 	kwargs = {}
 	if args:
