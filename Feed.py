@@ -270,30 +270,6 @@ class UpdateThread(QtCore.QThread):
 		return str(textNode.data), None
 
 
-	def __getPubDate(self, dom):
-		"""
-		Get the first item's pubDate attribute
-		as double seconds since the epoch.
-		"""
-		dateText, error = self.__getFirstItemText(dom, 'pubDate')
-		if dateText is None:
-			return None, error
-
-		parsedDateTuple = email.utils.parsedate_tz(dateText)
-		if not parsedDateTuple:
-			error = ("error parsing '%s' as date" % dateText)
-			return None, error
-
-		try:
-			doubleTime = email.utils.mktime_tz(parsedDateTuple)
-		except:
-			error = ("error building time value"
-				+ " from parsed date '%s'") % dateText
-			return None, error
-
-		return doubleTime, None
-
-
 	def __doUpdate(self):
 		try:
 			response = urllib2.urlopen(self.__rssURL)
@@ -315,12 +291,19 @@ class UpdateThread(QtCore.QThread):
 			self.log.error(self.__error, exc_info=True)
 			return
 
+		errorList = []
 		text, error = self.__getFirstItemText(dom, 'guid')
 		if text is None:
+			errorList.append(error)
 			text, error = self.__getFirstItemText(dom, 'pubDate')
 		if text is None:
-			self.__error = error
-			self.log.error(error)
+			errorList.append(error)
+			text, error = self.__getFirstItemText(dom, 'published')
+		if text is None:
+			errorList.append(error)
+			errorMsg = ' and '.join(errorList)
+			self.__error = errorMsg
+			self.log.error(errorMsg)
 			return
 
 		self.__current = text
