@@ -2,22 +2,20 @@ __all__ = [
 	'FeedGroup',
 ]
 
-from Manifest import QtUtil, logging
-from QtUtil.Manifest import QtCore
+from Manifest import logging
 from Feed import Feed
 
 log = logging.getLogger('gors')
 
 
 
-class FeedGroup(QtCore.QObject):
+class FeedGroup:
 	"""
 	Manage Feeds. Provide encapsulation for updating, opening,
 	and reading and writing them to/from QSettings in bulk.
 	"""
 	__SETTINGS_FEEDS = 'feeds'
 	def __init__(self):
-		QtCore.QObject.__init__(self)
 		self.__feeds = []
 		self.__feedsUpdatingSet = set()
 
@@ -28,8 +26,6 @@ class FeedGroup(QtCore.QObject):
 		updateFinished, the group will automatically open new content.
 		"""
 		self.__feeds.append(feed)
-		self.connect(feed, QtCore.SIGNAL('updateFinished'),
-			self.__feedUpdateFinished)
 
 
 	def getFeed(self, feedName):
@@ -54,8 +50,6 @@ class FeedGroup(QtCore.QObject):
 			raise ValueError("Feed '%s' not a group member. (%s)"
 				% (feed.getName(), feed))
 		self.__feeds.remove(feed)
-		self.disconnect(feed, QtCore.SIGNAL('updateFinished'),
-			self.__feedUpdateFinished)
 
 
 	def __filterFeeds(self, feedNames):
@@ -83,6 +77,7 @@ class FeedGroup(QtCore.QObject):
 		for feed in self.__filterFeeds(feedNames):
 			self.__feedsUpdatingSet.add(feed)
 			feed.update()
+			self.__feedUpdateFinished(feed)
 
 
 	def hasFeedsUpdating(self):
@@ -117,19 +112,15 @@ class FeedGroup(QtCore.QObject):
 		Feeds are read from a 'feeds' group under the current group,
 		and each subgroup of the 'feeds' group is taken as a Feed name.
 		"""
-		with QtUtil.Settings.GroupGuard(
-		settings, self.__SETTINGS_FEEDS):
-			groupNames = settings.childGroups()
+		with settings.groupGuard(self.__SETTINGS_FEEDS):
+			groupNames = settings.getChildGroups()
 			for groupName in groupNames:
-				feed = Feed(str(groupName))
-				with QtUtil.Settings.GroupGuard(
-				settings, groupName):
+				feed = Feed(groupName)
+				with settings.groupGuard(groupName):
 					feed.readSettings(settings)
 				self.addFeed(feed)
 		log.debug('Loaded feeds: %s'
 			% [f.getName() for f in self.__feeds])
-
-
 
 
 	def writeSettings(self, settings):
@@ -137,11 +128,9 @@ class FeedGroup(QtCore.QObject):
 		Write Feeds to the given QSettings object.
 		@see readSettings
 		"""
-		with QtUtil.Settings.GroupGuard(
-		settings, self.__SETTINGS_FEEDS):
+		with settings.groupGuard(self.__SETTINGS_FEEDS):
 			for feed in self.__feeds:
-				with QtUtil.Settings.GroupGuard(
-				settings, feed.getName()):
+				with settings.groupGuard(feed.getName()):
 					feed.writeSettings(settings)
 
 

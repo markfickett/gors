@@ -2,7 +2,7 @@ __all__ = [
 	'Feed',
 ]
 
-from Manifest import QtCore, enum, webbrowser, \
+from Manifest import enum, webbrowser, \
 	urllib2, xml, email, time, \
 	logging
 import email.utils
@@ -10,7 +10,7 @@ from xml.dom import minidom
 
 
 
-class Feed(QtCore.QObject):
+class Feed:
 	"""
 	Store information about a feed, including URLs to check and to open,
 	and timestamps of the latest available and viewed content.
@@ -34,7 +34,6 @@ class Feed(QtCore.QObject):
 		Create a new Feed with the given name.
 		Initially all other data fields are None.
 		"""
-		QtCore.QObject.__init__(self)
 		self.__name = str(name)
 		self.__rssURL = None
 		self.__openURL = None
@@ -112,16 +111,13 @@ class Feed(QtCore.QObject):
 		if self.__rssURL is None:
 			self.__error = 'cannot update: no RSS URL'
 			self.log.error(self.__error)
-			self.__emitUpdateFinished()
 			return
 
 		if self.__updateThread is not None:
 			return
 		self.__updateThread = UpdateThread(self.__name, self.__rssURL)
-		self.connect(self.__updateThread,
-			QtCore.SIGNAL('updateFinished'),
-			self.__updateThreadFinished)
-		self.__updateThread.start()
+		self.__updateThread.run()
+		self.__updateThreadFinished()
 
 
 	def __updateThreadFinished(self):
@@ -136,35 +132,28 @@ class Feed(QtCore.QObject):
 		self.__checked = time.time()
 
 
-		self.__emitUpdateFinished()
-
-
-	def __emitUpdateFinished(self):
-		self.emit(QtCore.SIGNAL('updateFinished'), self)
-
-
 	def readSettings(self, settings):
 		"""
 		Read state from a QSettings object. This expects keys to be
 		in the current group (so for multiple Feeds, the caller
 		should begin/end a group around each).
 		"""
-		if settings.contains(str(self.__SETTINGS.URL_RSS)):
-			self.__rssURL = str(settings.value(
-				str(self.__SETTINGS.URL_RSS)).toString())
-		if settings.contains(str(self.__SETTINGS.URL_OPEN)):
-			self.__openURL = str(settings.value(
-				str(self.__SETTINGS.URL_OPEN)).toString())
-		if settings.contains(str(self.__SETTINGS.OPENED)):
-			qv = settings.value(str(self.__SETTINGS.OPENED))
-			self.__opened = str(qv.toString())
-		if settings.contains(str(self.__SETTINGS.CURRENT)):
-			qv = settings.value(str(self.__SETTINGS.CURRENT))
-			self.__current = str(qv.toString())
-		if settings.contains(str(self.__SETTINGS.CHECKED)):
-			d, ok = settings.value(
-				str(self.__SETTINGS.CHECKED)).toDouble()
-			if ok:
+		if settings.contains(self.__SETTINGS.URL_RSS):
+			self.__rssURL = settings.getValue(
+				self.__SETTINGS.URL_RSS)
+		if settings.contains(self.__SETTINGS.URL_OPEN):
+			self.__openURL = settings.getValue(
+				self.__SETTINGS.URL_OPEN)
+		if settings.contains(self.__SETTINGS.OPENED):
+			self.__opened = settings.getValue(
+				self.__SETTINGS.OPENED)
+		if settings.contains(self.__SETTINGS.CURRENT):
+			self.__current = settings.getValue(
+				self.__SETTINGS.CURRENT)
+		if settings.contains(self.__SETTINGS.CHECKED):
+			d = settings.getFloatValue(
+				self.__SETTINGS.CHECKED)
+			if d is not None:
 				self.__checked = d
 
 
@@ -174,20 +163,20 @@ class Feed(QtCore.QObject):
 		@see readSettings
 		"""
 		if self.__rssURL is not None:
-			settings.setValue(str(self.__SETTINGS.URL_RSS),
-				QtCore.QVariant(QtCore.QString(self.__rssURL)))
+			settings.setValue(self.__SETTINGS.URL_RSS,
+				self.__rssURL)
 		if self.__openURL is not None:
-			settings.setValue(str(self.__SETTINGS.URL_OPEN),
-				QtCore.QVariant(QtCore.QString(self.__openURL)))
+			settings.setValue(self.__SETTINGS.URL_OPEN,
+				self.__openURL)
 		if self.__opened is not None:
-			settings.setValue(str(self.__SETTINGS.OPENED),
-				QtCore.QVariant(self.__opened))
+			settings.setValue(self.__SETTINGS.OPENED,
+				self.__opened)
 		if self.__current is not None:
-			settings.setValue(str(self.__SETTINGS.CURRENT),
-				QtCore.QVariant(self.__current))
+			settings.setValue(self.__SETTINGS.CURRENT,
+				self.__current)
 		if self.__checked is not None:
-			settings.setValue(str(self.__SETTINGS.CHECKED),
-				QtCore.QVariant(self.__checked))
+			settings.setValue(self.__SETTINGS.CHECKED,
+				self.__checked)
 
 
 	def __str__(self):
@@ -223,7 +212,7 @@ class Feed(QtCore.QObject):
 
 
 
-class UpdateThread(QtCore.QThread):
+class UpdateThread:
 	"""
 	Retrieve the time of the latest content publication for an RSS feed
 	by finding and interpreting the lastBuildDate channel attribute.
@@ -232,7 +221,6 @@ class UpdateThread(QtCore.QThread):
 		updateFinished	update completed (success or failure)
 	"""
 	def __init__(self, name, rssURL):
-		QtCore.QThread.__init__(self)
 		self.__rssURL = rssURL
 		self.__error = None
 		self.__current = None
@@ -242,8 +230,6 @@ class UpdateThread(QtCore.QThread):
 
 	def run(self):
 		self.__doUpdate()
-		# TODO why does finishing execution of run not emit finished?
-		self.emit(QtCore.SIGNAL('updateFinished'))
 
 
 	def __getFirstItemText(self, dom, name):

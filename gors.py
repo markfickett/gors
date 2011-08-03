@@ -2,7 +2,7 @@
 Check for updates to web sites via RSS, and open new content.
 """
 
-from Manifest import QtCore, time, logging, optparse
+from Manifest import time, logging, optparse
 import Manifest
 log = logging.getLogger('gors')
 
@@ -50,16 +50,10 @@ if options.verbose:
 
 from FeedGroup import FeedGroup
 from Feed import Feed
+from Settings import Settings
 
-# An application processing events is required for signals.
-app = QtCore.QCoreApplication([])
-
-QtCore.QCoreApplication.setOrganizationDomain('markfickett')
-QtCore.QCoreApplication.setOrganizationName('markfickett')
-QtCore.QCoreApplication.setApplicationName('gors')
-
-settings = QtCore.QSettings()
-log.debug("settings file is '%s'" % str(settings.fileName()))
+settings = Settings()
+log.debug("settings file is '%s'" % str(settings.getFileName()))
 
 feedGroup = FeedGroup()
 feedGroup.readSettings(settings)
@@ -109,7 +103,7 @@ if doUpdate:
 				% ', '.join(feedGroup.getUpdatingFeedNames()))
 		time.sleep(interval)
 		elapsed += interval
-		app.processEvents()
 
 feedGroup.writeSettings(settings)
+settings.write()
 
