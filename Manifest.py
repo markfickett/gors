@@ -6,6 +6,7 @@ logging.basicConfig(
 import enum
 import webbrowser, urllib2, xml, email, time, optparse, os
 import plistlib
+import threading
 
 VERSION = (0, 1)
 VERSION_STRING = '.'.join([str(v) for v in VERSION])

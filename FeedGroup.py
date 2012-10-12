@@ -2,7 +2,7 @@ __all__ = [
 	'FeedGroup',
 ]
 
-from Manifest import logging
+from Manifest import logging, threading
 from Feed import Feed
 
 log = logging.getLogger('gors')
@@ -18,6 +18,7 @@ class FeedGroup:
 	def __init__(self):
 		self.__feeds = []
 		self.__feedsUpdatingSet = set()
+		self.__feedsUpdatingSetLock = threading.Lock()
 
 
 	def addFeed(self, feed):
@@ -75,9 +76,9 @@ class FeedGroup:
 			(may be any object supporting 'in')
 		"""
 		for feed in self.__filterFeeds(feedNames):
-			self.__feedsUpdatingSet.add(feed)
-			feed.update()
-			self.__feedUpdateFinished(feed)
+			with self.__feedsUpdatingSetLock:
+				self.__feedsUpdatingSet.add(feed)
+			feed.update(self.__feedUpdateFinished)
 
 
 	def hasFeedsUpdating(self):
@@ -85,7 +86,8 @@ class FeedGroup:
 		Return whether any Feeds have started updating
 		but which have not yet reported finishing.
 		"""
-		return bool(self.__feedsUpdatingSet)
+		with self.__feedsUpdatingSetLock:
+			return bool(self.__feedsUpdatingSet)
 
 
 	def getUpdatingFeedNames(self):
@@ -93,12 +95,14 @@ class FeedGroup:
 		Return a list of names of Feeds which have started updating
 		but which have not yet reported finishing.
 		"""
-		return [f.getName() for f in self.__feedsUpdatingSet]
+		with self.__feedsUpdatingSetLock:
+			return [f.getName() for f in self.__feedsUpdatingSet]
 
 
 	def __feedUpdateFinished(self, feed):
-		if feed in self.__feedsUpdatingSet:
-			self.__feedsUpdatingSet.remove(feed)
+		with self.__feedsUpdatingSetLock:
+			if feed in self.__feedsUpdatingSet:
+				self.__feedsUpdatingSet.remove(feed)
 		if feed.hasUnopened():
 			feed.log.info('new: opening')
 			feed.open()

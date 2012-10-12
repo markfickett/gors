@@ -3,7 +3,7 @@ __all__ = [
 ]
 
 from Manifest import enum, webbrowser, \
-	urllib2, xml, email, time, \
+	urllib2, xml, email, time, threading, \
 	logging
 import email.utils
 from xml.dom import minidom
@@ -101,12 +101,12 @@ class Feed:
 		self.__opened = self.__current
 
 
-	def update(self):
+	def update(self, finishedCb):
 		"""
 		Check the RSS URL for the latest content. This runs the actual
-		retrieval in a separate thread, and emits updateFinished when on
-		completion (success or failure). (If an update thread is already
-		in progress, do nothing.)
+		retrieval in a separate thread, and calls finishedCb (with this
+		Feed as the sole argument) on completion (success or failure).
+		(If an update thread is already in progress, do nothing.)
 		"""
 		if self.__rssURL is None:
 			self.__error = 'cannot update: no RSS URL'
@@ -115,9 +115,13 @@ class Feed:
 
 		if self.__updateThread is not None:
 			return
-		self.__updateThread = UpdateThread(self.__name, self.__rssURL)
-		self.__updateThread.run()
-		self.__updateThreadFinished()
+		self.__finishedCb = finishedCb
+		self.__updateThread = UpdateThread(
+				self.__name,
+				self.__rssURL,
+				self.__updateThreadFinished)
+		self.__updateThread.daemon = True
+		self.__updateThread.start()
 
 
 	def __updateThreadFinished(self):
@@ -130,6 +134,7 @@ class Feed:
 			self.__current = self.__updateThread.getCurrent()
 		self.__updateThread = None
 		self.__checked = time.time()
+		self.__finishedCb(self)
 
 
 	def readSettings(self, settings):
@@ -212,24 +217,25 @@ class Feed:
 
 
 
-class UpdateThread:
+class UpdateThread(threading.Thread):
 	"""
 	Retrieve the time of the latest content publication for an RSS feed
-	by finding and interpreting the lastBuildDate channel attribute.
-
-	Signals:
-		updateFinished	update completed (success or failure)
+	by finding and interpreting the lastBuildDate channel attribute. On
+	completion (success or failure), call finishedCb with no arguments.
 	"""
-	def __init__(self, name, rssURL):
+	def __init__(self, name, rssURL, finishedCb):
+		threading.Thread.__init__(self)
 		self.__rssURL = rssURL
 		self.__error = None
 		self.__current = None
+		self.__finishedCb = finishedCb
 
 		self.log = logging.getLogger(name)
 
 
 	def run(self):
 		self.__doUpdate()
+		self.__finishedCb()
 
 
 	def __getFirstItemText(self, dom, name):
