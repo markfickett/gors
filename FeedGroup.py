@@ -12,7 +12,7 @@ log = logging.getLogger('gors')
 class FeedGroup:
 	"""
 	Manage Feeds. Provide encapsulation for updating, opening,
-	and reading and writing them to/from QSettings in bulk.
+	and reading and writing them to/from Settings in bulk.
 	"""
 	__SETTINGS_FEEDS = 'feeds'
 	def __init__(self):
@@ -108,7 +108,7 @@ class FeedGroup:
 
 	def readSettings(self, settings):
 		"""
-		Read Feeds from a QSettings object.
+		Read Feeds from a Settings object.
 		Feeds are read from a 'feeds' group under the current group,
 		and each subgroup of the 'feeds' group is taken as a Feed name.
 		"""
@@ -125,7 +125,7 @@ class FeedGroup:
 
 	def writeSettings(self, settings):
 		"""
-		Write Feeds to the given QSettings object.
+		Write Feeds to the given Settings object.
 		@see readSettings
 		"""
 		with settings.groupGuard(self.__SETTINGS_FEEDS):

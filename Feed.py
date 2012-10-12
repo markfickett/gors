@@ -134,7 +134,7 @@ class Feed:
 
 	def readSettings(self, settings):
 		"""
-		Read state from a QSettings object. This expects keys to be
+		Read state from a Settings object. This expects keys to be
 		in the current group (so for multiple Feeds, the caller
 		should begin/end a group around each).
 		"""
@@ -159,7 +159,7 @@ class Feed:
 
 	def writeSettings(self, settings):
 		"""
-		Write state to a QSettings object.
+		Write state to a Settings object.
 		@see readSettings
 		"""
 		if self.__rssURL is not None:
